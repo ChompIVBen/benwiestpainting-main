@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fibonacci and Chrysanthemum Background</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="toggleContainer" style="position: fixed; bottom: 10px; right: 10px; color: white;">
+      <button id="toggleControls">Toggle Controls</button>
+  </div>
+  <div id="controls" style="position: fixed; top: 10px; left: 10px; color: white;">
+    <label for="scaleFactor">Scale Factor: </label>
+        <input type="range" id="scaleFactor" min=".5" max="300" value="30">
+        <br>
+        <label for="angleMultiplier">Angle Multiplier: </label>
+        <input type="range" id="angleMultiplier" min="1" max="10" value="7" step=".01">
+        <br>
+        <label for="numPoints">Number of Points: </label>
+        <input type="range" id="numPoints" min="1" max="5000" value="150" step="1">
+        <br>
+        <label for="speed">Speed: </label>
+        <input type="range" id="speed" min="0.00001" max="20" value="2" step="0.05">
+        <br>
+        <label for="lineLength">Line Length: </label>
+        <input type="range" id="lineLength" min="0.01" max="50" value="1" step="0.01">
+        <label for="pointSize">Point Size: </label>
+        <input type="range" id="pointSize" min="0" max="100" value="0" step="0.01">
+        <br>
+    </div>
+  <script>
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        let width, height;
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener("resize", resizeCanvas);
+
+        resizeCanvas();
+
+        const goldenRatio = (1 + Math.sqrt(5)) / 2;
+        let time = 0;
+
+        const scaleFactorSlider = document.getElementById("scaleFactor");
+        const angleMultiplierSlider = document.getElementById("angleMultiplier");
+        const numPointsSlider = document.getElementById("numPoints");
+        const speedSlider = document.getElementById("speed");
+        const lineLengthSlider = document.getElementById("lineLength");
+
+        function fibonacci(n) {
+            return Math.round((Math.pow(goldenRatio, n) - Math.pow(1 - goldenRatio, n)) / Math.sqrt(5));
+        }
+
+        const pointSizeSlider = document.getElementById("pointSize");
+        const toggleControlsButton = document.getElementById("toggleControls");
+        const controlsDiv = document.getElementById("controls");
+
+        toggleControlsButton.addEventListener("click", () => {
+            if (controlsDiv.style.display === "none") {
+                controlsDiv.style.display = "block";
+            } else {
+                controlsDiv.style.display = "none";
+            }
+        });
+
+        function drawChrysanthemum() {
+            ctx.clearRect(0, 0, width, height);
+            const pointSize = parseFloat(pointSizeSlider.value);
+
+            const scaleFactor = parseInt(scaleFactorSlider.value);
+            const angleMultiplier = parseFloat(angleMultiplierSlider.value) + (Math.sin(time * 0.001) * 1);
+            const numPoints = parseInt(numPointsSlider.value);
+            const speed = parseFloat(speedSlider.value);
+            const lineLength = parseFloat(lineLengthSlider.value);
+
+            for (let i = 1; i <= numPoints; i++) {
+                let angle = i * goldenRatio * Math.PI * angleMultiplier;
+                let radius = scaleFactor * Math.sqrt(i);
+
+                let x = width / 2 + Math.cos(angle) * radius;
+                let y = height / 2 + Math.sin(angle) * radius;
+
+                ctx.beginPath();
+                ctx.arc(x, y, pointSize, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${angle * 180 / Math.PI + time * 0.1}, 100%, 50%, 1)`;
+                ctx.fill();
+
+            if (i > 1) {
+                ctx.beginPath();
+                ctx.moveTo(prevX, prevY);
+                ctx.lineTo(x, y);
+                ctx.strokeStyle = `hsla(${angle * 180 / Math.PI + time * 0.1}, 100%, 50%, 0.5)`;
+                ctx.lineWidth = lineLength;
+                ctx.stroke();
+            }
+
+            var prevX = x;
+            var prevY = y;
+        }
+    }
+
+    function animate() {
+        time += speedSlider.value * 0.01;
+        drawChrysanthemum();
+        requestAnimationFrame(animate);
+    }
+
+    animate();
+</script>
+</body>
+</html>
