@@ -19,10 +19,11 @@
 <body>
     <canvas id="canvas"></canvas>
     <div id="toggleContainer" style="position: fixed; bottom: 10px; right: 10px; color: white;">
-      <button id="toggleControls">Toggle Controls</button>
-  </div>
-  <div id="controls" style="position: fixed; top: 10px; left: 10px; color: white;">
-    <label for="scaleFactor">Scale Factor: </label>
+
+        <button id="toggleControls">Toggle Controls</button>
+      </div>
+    <div id="controls" style="position: fixed; top: 10px; left: 10px; color: white;">
+        <label for="scaleFactor">Scale Factor: </label>
         <input type="range" id="scaleFactor" min=".5" max="300" value="30">
         <br>
         <label for="angleMultiplier">Angle Multiplier: </label>
@@ -36,11 +37,25 @@
         <br>
         <label for="lineLength">Line Length: </label>
         <input type="range" id="lineLength" min="0.01" max="50" value="1" step="0.01">
+        <br>
         <label for="pointSize">Point Size: </label>
         <input type="range" id="pointSize" min="0" max="100" value="0" step="0.01">
         <br>
+        <button id="toggleAudioButton">Toggle Audio</button>
+
+<br>
     </div>
-  <script>
+    <script>
+      // Toggle audio
+let audioEnabled = false;
+toggleAudioButton.addEventListener("click", () => {
+    audioEnabled = !audioEnabled;
+    if (audioEnabled) {
+        masterGainNode.gain.value = 1; // Enable audio
+    } else {
+        masterGainNode.gain.value = 0; // Disable audio
+    }
+});
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
 
@@ -72,57 +87,142 @@
         const toggleControlsButton = document.getElementById("toggleControls");
         const controlsDiv = document.getElementById("controls");
 
-        toggleControlsButton.addEventListener("click", () => {
-            if (controlsDiv.style.display === "none") {
-                controlsDiv.style.display = "block";
-            } else {
-                controlsDiv.style.display = "none";
-            }
-        });
+        toggleControlsButton.addEventListener("click",
+        () => {
+    if (controlsDiv.style.display === "none") {
+        controlsDiv.style.display = "block";
+    } else {
+        controlsDiv.style.display = "none";
+    }
+});
 
-        function drawChrysanthemum() {
-            ctx.clearRect(0, 0, width, height);
-            const pointSize = parseFloat(pointSizeSlider.value);
+// Audio 
+ const filterCutoff = 80; // Adjust the cutoff frequency of the low-pass filter
+  const filterQ = 10; // Adjust the resonance (Q value) of the low-pass filter
+  const attackTime = 0.05; // Adjust the attack time of the gain envelope
+  const releaseTime = 0.05; // Adjust the release time of the gain envelope
 
-            const scaleFactor = parseInt(scaleFactorSlider.value);
-            const angleMultiplier = parseFloat(angleMultiplierSlider.value) + (Math.sin(time * 0.001) * 1);
-            const numPoints = parseInt(numPointsSlider.value);
-            const speed = parseFloat(speedSlider.value);
-            const lineLength = parseFloat(lineLengthSlider.value);
+// Audio generation parameters
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+const masterGainNode = audioContext.createGain();
+masterGainNode.connect(audioContext.destination);
+masterGainNode.gain.value = 0; // Adjust the overall volume of the audio
 
-            for (let i = 1; i <= numPoints; i++) {
-                let angle = i * goldenRatio * Math.PI * angleMultiplier;
-                let radius = scaleFactor * Math.sqrt(i);
+// Section-based instrument configuration
+const sections = [
+  { name: "strings", minRadius: 0, maxRadius: 200, baseFrequency: 220 },
+  { name: "brass", minRadius: 201, maxRadius: 400, baseFrequency: 440 },
+  { name: "woodwinds", minRadius: 401, maxRadius: 600, baseFrequency: 880 },
+];
 
-                let x = width / 2 + Math.cos(angle) * radius;
-                let y = height / 2 + Math.sin(angle) * radius;
+// Instrument parameters
+const instruments = {
+  strings: { type: "sawtooth", volume: 0.4 },
+  brass: { type: "triangle", volume: 0.6 },
+  woodwinds: { type: "sine", volume: 0.3 },
+};
 
-                ctx.beginPath();
-                ctx.arc(x, y, pointSize, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${angle * 180 / Math.PI + time * 0.1}, 100%, 50%, 1)`;
-                ctx.fill();
+function generateAudio(frequency, x, y) {
+  const section = getSection(x, y);
+  const instrument = instruments[section.name];
 
-            if (i > 1) {
-                ctx.beginPath();
-                ctx.moveTo(prevX, prevY);
-                ctx.lineTo(x, y);
-                ctx.strokeStyle = `hsla(${angle * 180 / Math.PI + time * 0.1}, 100%, 50%, 0.5)`;
-                ctx.lineWidth = lineLength;
-                ctx.stroke();
-            }
+  const oscillator = audioContext.createOscillator();
+  const filter = audioContext.createBiquadFilter();
+  const gainNode = audioContext.createGain();
 
-            var prevX = x;
-            var prevY = y;
-        }
+  oscillator.type = instrument.type;
+  oscillator.frequency.value = frequency;
+
+  filter.type = "lowpass";
+  filter.frequency.value = filterCutoff;
+  filter.Q.value = filterQ;
+
+  gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+  gainNode.gain.linearRampToValueAtTime(
+    instrument.volume,
+    audioContext.currentTime + attackTime
+  );
+  gainNode.gain.linearRampToValueAtTime(
+    0,
+    audioContext.currentTime + attackTime + releaseTime
+  );
+
+  oscillator.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(masterGainNode);
+
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + attackTime + releaseTime);
+}
+
+function getSection(x, y) {
+  const radius = Math.sqrt(x * x + y * y);
+
+  for (const section of sections) {
+    if (radius >= section.minRadius && radius <= section.maxRadius) {
+      return section;
+    }
+  }
+
+  // If no section is found, default to the first section
+  return sections[0];
+}
+
+function drawChrysanthemum() {
+  ctx.clearRect(0, 0, width, height);
+  const pointSize = parseFloat(pointSizeSlider.value);
+
+  const scaleFactor = parseInt(scaleFactorSlider.value);
+  const angleMultiplier =
+    parseFloat(angleMultiplierSlider.value) + Math.sin(time * 0.001) * 1;
+  const numPoints = parseInt(numPointsSlider.value);
+  const speed = parseFloat(speedSlider.value);
+  const lineLength = parseFloat(lineLengthSlider.value);
+
+  for (let i = 1; i <= numPoints; i++) {
+    let angle = i * goldenRatio * Math.PI * angleMultiplier;
+    let radius = scaleFactor * Math.sqrt(i);
+
+    let x = width / 2 + Math.cos(angle) * radius;
+    let y = height / 2 + Math.sin(angle) * radius;
+
+    ctx.beginPath();
+    ctx.arc(x, y, pointSize, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${angle * 180 / Math.PI + time * 0.1}, 100%, 50%, 1)`;
+    ctx.fill();
+
+    if (i > 1) {
+      ctx.beginPath();
+      ctx.moveTo(prevX, prevY);
+      ctx.lineTo(x, y);
+      ctx.strokeStyle = `hsla(${angle * 180 / Math.PI + time * 0.1}, 100%, 50%, 0.5)`;
+      ctx.lineWidth = lineLength;
+      ctx.stroke();
     }
 
-    function animate() {
-        time += speedSlider.value * 0.01;
-        drawChrysanthemum();
-        requestAnimationFrame(animate);
-    }
+    var prevX = x;
+    var prevY = y;
 
-    animate();
+     // Define the base frequency for the audio generation
+     const baseFrequency = 200;
+     const frequencyRange = 1000;
+
+if (i % 15 === 0 && i > 24 && i<200) {
+  // Generate audio based on x and y coordinates for the desired points
+  const frequency = baseFrequency + (x + y) % frequencyRange;
+  generateAudio(frequency, x, y);
+}
+}
+}
+
+function animate() {
+time += speedSlider.value * 0.01;
+drawChrysanthemum();
+requestAnimationFrame(animate);
+}
+
+animate();
 </script>
 </body>
 </html>
+
